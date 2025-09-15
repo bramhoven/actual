@@ -576,6 +576,27 @@ class AccountInternal extends PureComponent<
     );
   };
 
+  onHistoricSync = async () => {
+    const accountId = this.props.accountId!;
+    const account = this.props.accounts.find(
+      account => account.id === accountId,
+    )!;
+
+    this.props.dispatch(
+      pushModal({
+        modal: {
+          name: 'historic-bank-sync',
+          options: {
+            accountName: account.name,
+            onSync: () => {
+              this.props.dispatch(unlinkAccount({ id: accountId }));
+            },
+          },
+        },
+      }),
+    );
+  }
+
   onImport = async () => {
     const accountId = this.props.accountId;
     const account = this.props.accounts.find(acct => acct.id === accountId);
@@ -1777,6 +1798,7 @@ class AccountInternal extends PureComponent<
                   this.onCreateReconciliationTransaction
                 }
                 onSync={this.onSync}
+                onHistoricSync={this.onHistoricSync}
                 onImport={this.onImport}
                 onBatchDelete={this.onBatchDelete}
                 onBatchDuplicate={this.onBatchDuplicate}

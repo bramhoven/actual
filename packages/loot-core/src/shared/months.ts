@@ -395,6 +395,22 @@ export function getYearEnd(month: string): string {
   return getYear(month) + '-12';
 }
 
+export function getNumberOfDays(start: string, end: string) {
+    const date1 = parseDate(start);
+    const date2 = parseDate(end);
+
+    // One day in milliseconds
+    const oneDay = 1000 * 60 * 60 * 24;
+
+    // Calculating the time difference between two dates
+    const diffInTime = date2.getTime() - date1.getTime();
+
+    // Calculating the no. of days between two dates
+    const diffInDays = Math.round(diffInTime / oneDay);
+
+    return diffInDays;
+}
+
 export function sheetForMonth(month: string): string {
   return 'budget' + month.replace('-', '');
 }

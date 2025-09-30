@@ -65,6 +65,7 @@ export type AccountHandlers = {
   'simplefin-batch-sync': typeof simpleFinBatchSync;
   'transactions-import': typeof importTransactions;
   'account-unlink': typeof unlinkAccount;
+  'historic-bank-sync': typeof historicBankSync; 
 };
 
 async function updateAccount({
@@ -1211,6 +1212,78 @@ async function unlinkAccount({ id }: { id: AccountEntity['id'] }) {
   return 'ok';
 }
 
+async function historicBankSync({
+  ids = [],
+  startDate
+}: {
+  ids: Array<AccountEntity['id']>;
+  startDate: string;
+}): Promise<SyncResponseWithErrors> {
+  const { 'user-id': userId, 'user-key': userKey } =
+    await asyncStorage.multiGet(['user-id', 'user-key']);
+
+  const accounts = await db.runQuery<
+    db.DbAccount & { bankId: db.DbBank['bank_id'] }
+  >(
+    `
+    SELECT a.*, b.bank_id as bankId
+    FROM accounts a
+    LEFT JOIN banks b ON a.bank = b.id
+    WHERE a.tombstone = 0 AND a.closed = 0
+      ${ids.length ? `AND a.id IN (${ids.map(() => '?').join(', ')})` : ''}
+    ORDER BY a.offbudget, a.sort_order
+  `,
+    ids,
+    true,
+  );
+
+  const errors: ReturnType<typeof handleSyncError>[] = [];
+  const newTransactions: Array<TransactionEntity['id']> = [];
+  const matchedTransactions: Array<TransactionEntity['id']> = [];
+  const updatedAccounts: Array<AccountEntity['id']> = [];
+
+  for (const acct of accounts) {
+    if (acct.bankId && acct.account_id) {
+      try {
+        console.group('Historic Bank Sync operation for account:', acct.name);
+        const syncResponse = await bankSync.syncHistoricAccount(
+          userId as string,
+          userKey as string,
+          acct.id,
+          acct.account_id,
+          acct.bankId,
+          startDate,
+        );
+
+        const syncResponseData = await handleSyncResponse(syncResponse, acct);
+
+        newTransactions.push(...syncResponseData.newTransactions);
+        matchedTransactions.push(...syncResponseData.matchedTransactions);
+        updatedAccounts.push(...syncResponseData.updatedAccounts);
+      } catch (err) {
+        console.log(err)
+        const error = err as Error;
+        errors.push(handleSyncError(error, acct));
+        captureException({
+          ...error,
+          message: 'Failed syncing account “' + acct.name + '.”',
+        } as Error);
+      } finally {
+        console.groupEnd();
+      }
+    }
+  }
+
+  if (updatedAccounts.length > 0) {
+    connection.send('sync-event', {
+      type: 'success',
+      tables: ['transactions'],
+    });
+  }
+
+  return { errors, newTransactions, matchedTransactions, updatedAccounts };
+}
+
 export const app = createApp<AccountHandlers>();
 
 app.method('account-update', mutator(undoable(updateAccount)));
@@ -1239,3 +1312,4 @@ app.method('accounts-bank-sync', accountsBankSync);
 app.method('simplefin-batch-sync', simpleFinBatchSync);
 app.method('transactions-import', mutator(undoable(importTransactions)));
 app.method('account-unlink', mutator(unlinkAccount));
+app.method('historic-bank-sync', mutator(historicBankSync));

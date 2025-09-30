@@ -102,6 +102,7 @@ type AccountHeaderProps = {
   onSaveName: AccountNameFieldProps['onSaveName'];
   saveNameError: AccountNameFieldProps['saveNameError'];
   onSync: () => void;
+  onHistoricSync: () => void;
   onImport: () => void;
   onMenuSelect: AccountMenuProps['onMenuSelect'];
   onReconcile: ComponentProps<typeof ReconcileMenu>['onReconcile'];
@@ -172,6 +173,7 @@ export function AccountHeader({
   onSaveName,
   saveNameError,
   onSync,
+  onHistoricSync,
   onImport,
   onMenuSelect,
   onReconcile,
@@ -368,6 +370,7 @@ export function AccountHeader({
           style={{ marginTop: 12 }}
         >
           {canSync && (
+            <>
             <Button
               variant="bare"
               onPress={onSync}
@@ -384,6 +387,23 @@ export function AccountHeader({
               />{' '}
               {isServerOffline ? t('Bank Sync Offline') : t('Bank Sync')}
             </Button>
+            <Button
+              variant="bare"
+              onPress={onHistoricSync}
+              isDisabled={isServerOffline}
+            >
+              <AnimatedRefresh
+                width={13}
+                height={13}
+                animating={
+                  account
+                    ? accountsSyncing.includes(account.id)
+                    : accountsSyncing.length > 0
+                }
+              />{' '}
+              {isServerOffline ? t('Historic Bank Sync Offline') : t('Historic Bank Sync')}
+            </Button>
+            </>
           )}
 
           {account && !account.closed && (

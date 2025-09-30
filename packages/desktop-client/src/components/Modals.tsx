@@ -69,6 +69,7 @@ import { TrackingBudgetSummaryModal } from './modals/TrackingBudgetSummaryModal'
 import { TransferModal } from './modals/TransferModal';
 import { TransferOwnership } from './modals/TransferOwnership';
 import { UnmigrateBudgetAutomationsModal } from './modals/UnmigrateBudgetAutomationsModal';
+import { HistoricBankSyncModal } from './modals/HistoricSyncModal';
 import { CategoryLearning } from './payees/CategoryLearning';
 import { DiscoverSchedules } from './schedules/DiscoverSchedules';
 import { PostsOfflineNotification } from './schedules/PostsOfflineNotification';
@@ -391,6 +392,9 @@ export function Modals() {
 
         case 'enable-password-auth':
           return <PasswordEnableModal key={key} {...modal.options} />;
+
+        case 'historic-bank-sync':
+          return <HistoricBankSyncModal key={key} {...modal.options} />;
 
         default:
           throw new Error('Unknown modal');

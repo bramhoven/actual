@@ -553,6 +553,13 @@ export type Modal =
         categoryId: CategoryEntity['id'];
         templates: Template[];
       };
+    }
+  | {
+      name: 'historic-bank-sync';
+      options: {
+        accountName: string;
+        onSync: () => void;
+      }
     };
 
 type OpenAccountCloseModalPayload = {

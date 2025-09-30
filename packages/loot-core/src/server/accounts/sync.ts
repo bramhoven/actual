@@ -14,6 +14,7 @@ import {
   hasFieldsChanged,
   amountToInteger,
   integerToAmount,
+  fastSetMerge,
 } from '../../shared/util';
 import {
   AccountEntity,
@@ -36,6 +37,7 @@ import {
 
 import { getStartingBalancePayee } from './payees';
 import { title } from './title';
+import { date } from 'fast-check';
 
 function BankSyncError(type: string, code: string, details?: object) {
   return { type: 'BankSyncError', category: type, code, details };
@@ -101,6 +103,26 @@ async function getAccountSyncStartDate(id) {
   return monthUtils.dayFromDate(
     dateFns.max(dates.map(d => monthUtils.parseDate(d))),
   );
+}
+
+async function getSyncDates(id, startDate: string) {
+  const dates: Array<string> = [startDate];
+
+  const today = monthUtils.currentDay();
+  let currentDate = startDate;
+  while (monthUtils.parseDate(currentDate) < monthUtils.currentDate()) {
+    const days = monthUtils.getNumberOfDays(dates[dates.length-1], today)
+    if (days > 90) {
+      currentDate = monthUtils.addDays(startDate, 90);
+      dates.push(currentDate);
+    } else {
+      currentDate = monthUtils.addDays(startDate, days);
+      dates.push(currentDate);
+      break;
+    }
+  }
+
+  return dates;
 }
 
 export async function getGoCardlessAccounts(userId, userKey, id) {
@@ -1002,6 +1024,64 @@ export async function syncAccount(
   }
 
   return processBankSyncDownload(download, id, acctRow, newAccount);
+}
+
+export async function syncHistoricAccount(
+  userId: string | undefined,
+  userKey: string | undefined,
+  id: string,
+  acctId: string,
+  bankId: string,
+  syncStartDate: string,
+) {
+  const acctRow = await db.select('accounts', id);
+
+  const syncDates = await getSyncDates(id, syncStartDate);
+  const oldestTransaction = await getAccountOldestTransaction(id);
+  const newAccount = oldestTransaction == null;
+
+  let reconcileTransactions = {added: [], updated: [], updatedPreview: []} as ReconcileTransactionsResult;
+  for (const date of syncDates) {
+    let download;
+    if (acctRow.account_sync_source === 'simpleFin') {
+      try {
+        download = await downloadSimpleFinTransactions(acctId, date);
+      } catch {
+        break;
+      }
+    } else if (acctRow.account_sync_source === 'pluggyai') {
+      try {
+        download = await downloadPluggyAiTransactions(acctId, date);
+      } catch {
+        break;
+      }
+    } else if (acctRow.account_sync_source === 'goCardless') {
+      try {
+        download = await downloadGoCardlessTransactions(
+          userId,
+          userKey,
+          acctId,
+          bankId,
+          date,
+          newAccount,
+        );
+      } catch {
+        break;
+      }
+    } else {
+      throw new Error(
+        `Unrecognized bank-sync provider: ${acctRow.account_sync_source}`,
+      );
+    }
+
+    const result = await processBankSyncDownload(download, id, acctRow, newAccount);
+    reconcileTransactions = {
+      added: [...reconcileTransactions.added, ...result.added],
+      updated: [...reconcileTransactions.updated, ...result.updated],
+      updatedPreview: [...reconcileTransactions.updatedPreview, ...result.updatedPreview]
+    }
+  }
+  return reconcileTransactions;
 }
 
 export async function simpleFinBatchSync(

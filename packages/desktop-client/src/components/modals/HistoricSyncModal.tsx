@@ -75,7 +75,7 @@ export const HistoricBankSyncModal = ({
   };
 
   return (
-    <Modal name="historic-bank-sync" containerProps={{ style: { width: '30vw' } }}>
+    <Modal name="historic-bank-sync" containerProps={{ style: { width: '30vw' } }} isDismissable={false}>
       {({ state: { close } }) => (
         <>
           <ModalHeader
@@ -91,7 +91,7 @@ export const HistoricBankSyncModal = ({
             </Text>
 
             <FormField>
-              <View style={{ width: '13.44rem', marginBottom: 150 }} >
+              <View style={{ width: '13.44rem' }} >
                 <FormLabel title={t('Start Date:')} htmlFor="historic-sync-start-date" />
                 <InitialFocus>
                   <DateSelect
